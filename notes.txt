@@ -14,3 +14,4 @@ todo:
 - make value_t not just an int (ie add strings)
 - better error stuff. not just `printf("gah! info"); exit(1);`
 	- stack trace
+- reorganize stuff
