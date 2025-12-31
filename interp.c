@@ -4,6 +4,8 @@
 #include <ctype.h>
 #include <time.h>
 
+#include "words.h"
+
 #define MAX_BLOCK_STACK_SIZE 16
 #define MAX_VARS 128
 #define MAX_STACK_SIZE 2048
@@ -182,7 +184,7 @@ const char* INST_KWS[] = {
     "gte",
     "lte",
     "gosub",
-    "endsub",
+    "return",
     "print",
 };
 
@@ -307,9 +309,9 @@ void do_instruction(char *tok, char *rest) {
 
         state.lineptr = info.start-1; // do -1 to counteract lineptr++ at the end of each line
     } else
-    if (!strcmp(tok,"endsub")) {
+    if (!strcmp(tok,"return")) {
         state.lineptr = pop_call(); // DONT -1 bc that would run `gosub` again and cause an infinite loop
-                                    //
+
         /* printf("returning to %d\n",state.lineptr); */
     }
 }
