@@ -15,7 +15,6 @@
 enum block_type {
     BLOCK_IF = 1,
     BLOCK_WHILE,
-    /* BLOCK_SUB, */
 };
 
 typedef struct block_item {
@@ -167,25 +166,25 @@ void add_subroutine(char* name, struct subroutine_info info) {
 }
 
 const char* INST_KWS[] = {
-    "pushvar",
-    "popvar",
-    "pushnum",
-    "pushstr",
-    "readnum",
-    "add",
-    "sub",
-    "mul",
-    "div",
-    "mod",
-    "eq",
-    "neq",
-    "gt",
-    "lt",
-    "gte",
-    "lte",
-    "gosub",
-    "return",
-    "print",
+    W_PUSHVAR,
+    W_POPVAR,
+    W_PUSHNUM,
+    W_PUSHSTR,
+    W_READNUM,
+    W_ADD,
+    W_SUB,
+    W_MUL,
+    W_DIV,
+    W_MOD,
+    W_EQ,
+    W_NEQ,
+    W_GT,
+    W_LT,
+    W_GTE,
+    W_LTE,
+    W_GOSUB,
+    W_RETURN,
+    W_PRINT,
 };
 
 int get_instruction(char *str) {
@@ -248,11 +247,11 @@ char* parse_string(char *str) {
 void do_instruction(char *tok, char *rest) {
     /* printf("\tim a do instructin: '%s' '%s'\n",tok,rest); */
     
-    if (!strcmp(tok,"pushnum")) {
+    if (!strcmp(tok,W_PUSHNUM)) {
         value_t v = (value_t){.type=VAL_NUM, .num=atof(rest)}; //TODO: error detection AND replace `rest` w/ getting another token
         push_val(v);
     } else
-    if (!strcmp(tok,"pushstr")) {
+    if (!strcmp(tok,W_PUSHSTR)) {
         char *str = parse_string(rest);
         if (str == NULL) {
             printf("gah! string '%s' was unparsable!\n",rest);
@@ -262,7 +261,7 @@ void do_instruction(char *tok, char *rest) {
 
         push_val(v);
     } else
-    if (!strcmp(tok,"print")) {
+    if (!strcmp(tok,W_PRINT)) {
         value_t v = pop_val();
         switch (v.type) {
         case VAL_NUM:
@@ -273,7 +272,7 @@ void do_instruction(char *tok, char *rest) {
             printf("(null value)\n"); break;
         }
     } else
-    if (!strcmp(tok,"readnum")) {
+    if (!strcmp(tok,W_READNUM)) {
         value_t value;
         value.type = VAL_NUM;
         printf("\t\t\t\t\t\tinput nuber: ");
@@ -283,19 +282,19 @@ void do_instruction(char *tok, char *rest) {
         }
         push_val(value);
     } else
-    if (!strcmp(tok,"add")) {
+    if (!strcmp(tok,W_ADD)) {
         value_t b = pop_val();
         value_t a = pop_val();
         //TODO: assert a.type == VAL_NUM && b.type == VAL_NUM
         push_val((value_t){.type=VAL_NUM, .num = a.num+b.num});
     } else
-    if (!strcmp(tok,"eq")) {
+    if (!strcmp(tok,W_EQ)) {
         value_t b = pop_val();
         value_t a = pop_val();
         //TODO: assert a.type == VAL_NUM && b.type == VAL_NUM
         push_val((value_t){.type=VAL_NUM, .num = a.num == b.num});
     } else
-    if (!strcmp(tok,"gosub")) {
+    if (!strcmp(tok,W_GOSUB)) {
         // read the sub name
         tok = strtok_r(rest," \t",&rest);
         //TODO: assert tok != NULL
@@ -309,7 +308,7 @@ void do_instruction(char *tok, char *rest) {
 
         state.lineptr = info.start-1; // do -1 to counteract lineptr++ at the end of each line
     } else
-    if (!strcmp(tok,"return")) {
+    if (!strcmp(tok,W_RETURN)) {
         state.lineptr = pop_call(); // DONT -1 bc that would run `gosub` again and cause an infinite loop
 
         /* printf("returning to %d\n",state.lineptr); */
@@ -323,12 +322,12 @@ void do_skip(char* tok) {
 
     switch (block->type) {
     case BLOCK_IF:
-        if (!strcmp(tok,"if")) {
+        if (!strcmp(tok,W_IF)) {
             state.skip_depth++;
-        } else if (state.skip_depth == 0 && !strcmp(tok,"else")) {
+        } else if (state.skip_depth == 0 && !strcmp(tok,W_ELSE)) {
             // if there's an `else`, and we're already skipping, then stop skipping
             state.skip = false;
-        } else if (!strcmp(tok,"endif")) { // if skip depth is 0 then it will stop skipping at the end of this func
+        } else if (!strcmp(tok,W_ENDIF)) { // if skip depth is 0 then it will stop skipping at the end of this func
             state.skip_depth--;
         }
         break;
@@ -343,7 +342,7 @@ void do_skip(char* tok) {
 }
 
 void do_subroutine_line(char *line) {
-    if (!strcmp(line,"endsub")) {
+    if (!strcmp(line,W_ENDSUB)) {
         add_subroutine(
             state.current_subroutine.name,
             (struct subroutine_info){
@@ -388,11 +387,11 @@ void look_at_dis_line(char *str) {
         return;
     }
 
-    if (!strcmp(tok,"if")) {
+    if (!strcmp(tok,W_IF)) {
         push_block(NEW_BLOCK_IF);
         /* printf("im in if!\n"); */
     } else
-    if (!strcmp(tok,"then")) {
+    if (!strcmp(tok,W_THEN)) {
         /* printf("then what\n"); */
         /* bool value = rand()&1; //TODO: actually get value */
         bool value = is_value_true(pop_val());
@@ -404,17 +403,17 @@ void look_at_dis_line(char *str) {
             state.skip_depth = 0;
         }
     } else
-    if (!strcmp(tok,"else")) {
+    if (!strcmp(tok,W_ELSE)) {
         // if we see this then it means that we aren't skipping (so the
         // condition was true) so we should skip until `endif`
         state.skip = true;
         state.skip_depth = 0;
     } else
-    if (!strcmp(tok,"endif")) {
+    if (!strcmp(tok,W_ENDIF)) {
         block_item block = pop_block();
         /* printf("just pooped block type %d i hope its %d\n", block.type, BLOCK_IF); */
     } else
-    if (!strcmp(tok,"defsub")) { // start reading the subroutine
+    if (!strcmp(tok,W_DEFSUB)) { // start reading the subroutine
         tok = strtok_r(rest, " \t", &rest);
         if (tok == NULL) {
             printf("gah! expected a name for da subroutine\n");
@@ -503,3 +502,4 @@ int main(int argc, char **argv) {
     fclose(f);
 
 }
+
