@@ -5,11 +5,13 @@ defsub goo
 	eq
 endsub
 
+pushstr "hi"
+print
 
 if
 	gosub goo
 then
-	pushnum 67
+	pushstr "hello"
 	print
 else
 	if

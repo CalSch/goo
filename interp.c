@@ -22,10 +22,33 @@ typedef struct block_item {
     };
 } block_item;
 
-typedef int value_t;
+enum value_type {
+    VAL_NULL,
+    VAL_NUM,
+    VAL_STR,
+};
+typedef struct value_t {
+    enum value_type type;
+    union {
+        float num;
+        char* str;
+    };
+} value_t;
+
+bool is_value_true(value_t v) {
+    switch (v.type) {
+    case VAL_NULL:
+        return false;
+    case VAL_NUM:
+        return (bool)v.num;
+    case VAL_STR:
+        return v.str != NULL && strlen(v.str) != 0;
+    default:
+        return false;
+    }
+}
 
 #define NEW_BLOCK_IF (block_item){ BLOCK_IF }
-/* #define NEW_BLOCK_SUB (block_item){ BLOCK_SUB, .d_sub={NULL,0,0} } */
 
 struct subroutine_info {
     int start, end;
@@ -73,6 +96,9 @@ struct state_t {
 };
 
 struct state_t state = {0};
+bool debug_pushes = false;
+bool debug_pops = false;
+bool debug_lines = false;
 
 // generic stack functions
 #define GEN_STACK_PUSH(val, stack, stackptr, size) \
@@ -98,9 +124,16 @@ block_item pop_block() {
 }
 
 void push_val(value_t val) {
+    if (debug_pushes) {
+        printf("pushing value %f/'%s'\n",
+            val.type==VAL_NUM?val.num:0,
+            val.type==VAL_STR?val.str:"");
+    }
     GEN_STACK_PUSH(val, state.stack, state.stack_ptr, MAX_STACK_SIZE);
 }
 value_t pop_val() {
+    if (debug_pops)
+        printf("pop\n");
     return GEN_STACK_POP(state.stack, state.stack_ptr, value_t);
 }
 
@@ -135,6 +168,7 @@ const char* INST_KWS[] = {
     "pushvar",
     "popvar",
     "pushnum",
+    "pushstr",
     "readnum",
     "add",
     "sub",
@@ -161,35 +195,103 @@ int get_instruction(char *str) {
     return -1;
 }
 
+char* parse_string(char *str) {
+    bool escape_next = false;
+    char *dest = malloc(strlen(str)+1); // the biggest it can be is the same as the original string
+    
+    char *ptr = str;
+    char *destptr = dest;
+    for (; *ptr != 0; ptr++) {
+        if (ptr == str) { // if this is the first char...
+            // ignore first quote, error if there isnt one
+            if (*ptr == '"')
+                continue;
+            else
+                return NULL;
+        }
+
+        if (escape_next) {
+            if (*ptr == 'n')
+                *destptr = '\n';
+            else if (*ptr == 't')
+                *destptr = '\t';
+            else
+                *destptr = *ptr;
+            destptr++;
+            escape_next = false;
+            continue;
+        }
+
+        if (*ptr == '\\') {
+            escape_next = true;
+            continue;
+        }
+
+        if (*ptr == '"') {
+            break;
+        }
+
+        *destptr = *ptr;
+        destptr++;
+
+    }
+
+    // dest might be too big, so lets make res which is the right size
+    char *res = strdup(dest);
+    free(dest);
+
+    return res;
+}
+
 void do_instruction(char *tok, char *rest) {
     /* printf("\tim a do instructin: '%s' '%s'\n",tok,rest); */
     
     if (!strcmp(tok,"pushnum")) {
-        value_t value = atoi(rest); //TODO: error detection
-        push_val(value);
+        value_t v = (value_t){.type=VAL_NUM, .num=atof(rest)}; //TODO: error detection AND replace `rest` w/ getting another token
+        push_val(v);
+    } else
+    if (!strcmp(tok,"pushstr")) {
+        char *str = parse_string(rest);
+        if (str == NULL) {
+            printf("gah! string '%s' was unparsable!\n",rest);
+            exit(1);
+        }
+        value_t v = (value_t){.type=VAL_STR, .str=str};
+
+        push_val(v);
     } else
     if (!strcmp(tok,"print")) {
-        value_t value = pop_val();
-        printf("\t\t\t\t\t\tattention!!       %d\n",value);
+        value_t v = pop_val();
+        switch (v.type) {
+        case VAL_NUM:
+            printf("%f\n",v.num); break;
+        case VAL_STR:
+            printf("%s\n",v.str); break;
+        default:
+            printf("(null value)\n"); break;
+        }
     } else
     if (!strcmp(tok,"readnum")) {
         value_t value;
+        value.type = VAL_NUM;
         printf("\t\t\t\t\t\tinput nuber: ");
-        if (scanf("%d",&value) != 1) {
+        if (scanf("%f",&value.num) != 1) {
             printf("\t\t\t\t\t\t invalid so 0 >:(");
-            value = 0;
+            value = (value_t){.type=VAL_NUM,.num=0};
         }
         push_val(value);
     } else
     if (!strcmp(tok,"add")) {
         value_t b = pop_val();
         value_t a = pop_val();
-        push_val(a+b);
+        //TODO: assert a.type == VAL_NUM && b.type == VAL_NUM
+        push_val((value_t){.type=VAL_NUM, .num = a.num+b.num});
     } else
     if (!strcmp(tok,"eq")) {
         value_t b = pop_val();
         value_t a = pop_val();
-        push_val(a == b);
+        //TODO: assert a.type == VAL_NUM && b.type == VAL_NUM
+        push_val((value_t){.type=VAL_NUM, .num = a.num == b.num});
     } else
     if (!strcmp(tok,"gosub")) {
         // read the sub name
@@ -291,7 +393,7 @@ void look_at_dis_line(char *str) {
     if (!strcmp(tok,"then")) {
         /* printf("then what\n"); */
         /* bool value = rand()&1; //TODO: actually get value */
-        bool value = pop_val();
+        bool value = is_value_true(pop_val());
         /* printf("ok its %s\n",value?"true":"false"); */
         block_item* block = get_block();
 
@@ -324,7 +426,9 @@ void look_at_dis_line(char *str) {
 
 void interp_go() {
     for (;state.lineptr < state.linecount; state.lineptr++) {
-        /* printf("lp=%02d  |  '%s'\n",state.lineptr,state.lines[state.lineptr]); */
+        if (debug_lines) {
+            printf("lp=%02d  |  '%s'\n",state.lineptr,state.lines[state.lineptr]);
+        }
         if (strlen(state.lines[state.lineptr])==0) {
             /* printf("\tempty, skipping...\n"); */
             continue;
@@ -344,11 +448,26 @@ int countlines(FILE* f) {
 
 int main(int argc, char **argv) {
     srand(time(NULL));
-    if (argc < 2) {
-        printf("need to have filename\n");
-        return 1;
+    char* filename = NULL;
+    
+    // parse args
+    for (int i=1;i<argc;i++) {
+        if (!strcmp(argv[i],"-f")) {
+            filename=argv[i+1];
+            i++;
+        } else if (!strcmp(argv[i],"-d")) {
+            debug_pushes=true;
+            debug_pops=true;
+            debug_lines=true;
+        }
     }
-    FILE* f = fopen(argv[1],"r");
+
+    if (filename==NULL) {
+        printf("need filename (-f name)\n");
+        exit(1);
+    }
+
+    FILE* f = fopen(filename,"r");
     if (f == NULL) {
         perror("fopen()");
         return 1;
