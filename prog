@@ -1,0 +1,39 @@
+var n
+readnum
+popvar n
+
+defsub even
+	# n=n/2
+	pushvar n
+	pushnum 2
+	div
+	popvar n
+endsub
+
+defsub odd
+	# n=3*n+1
+	pushnum 1
+	pushvar n
+	pushnum 3
+	mul
+	add
+	popvar n
+endsub
+
+
+while
+	pushvar n
+	neq 1
+do
+	if
+		pushvar n
+		pushnum 2
+		mod
+	do
+		gosub even
+	else
+		gosub odd
+	endif
+endwhile
+
+

@@ -1,0 +1,21 @@
+
+defsub goo
+	readnum
+	readnum
+	eq
+endsub
+
+
+if
+	gosub goo
+then
+	pushnum 67
+	print
+else
+	if
+		gosub goo
+	then
+		pushnum 61
+		print
+	endif
+endif

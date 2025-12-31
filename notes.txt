@@ -1,0 +1,16 @@
+- fully interpreted, stack based language
+- instructions: pushnum, pushvar, popvar, add, print, etc.
+- blocks: `if`. `while` and `for` coming soon
+
+ideas:
+- keep track of what pushed each value onto the stack for debuggering
+
+todo:
+- fix TODO comments
+- ~~subroutine reading doesnt really need to go on the block stack, make the subroutine state its own thing~~
+- make nice functions
+	- `is_reading_subroutine()`
+	- `goto(int loc)`
+- make value_t not just an int (ie add strings)
+- better error stuff. not just `printf("gah! info"); exit(1);`
+	- stack trace
