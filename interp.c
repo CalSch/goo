@@ -19,8 +19,7 @@ enum block_type {
 
 typedef struct block_item {
     enum block_type type;
-    union {
-    };
+    int while_start;
 } block_item;
 
 enum value_type {
@@ -145,6 +144,26 @@ int pop_call() {
     return GEN_STACK_POP(state.call_stack, state.call_stack_ptr, int);
 }
 
+value_t get_var_value(char *name) {
+    for (int i=0;i<state.var_count;i++) {
+        if (!strcmp(name,state.var_names[i])) {
+            return state.var_values[i];
+        }
+    }
+    return (value_t){.type=VAL_NULL};
+}
+void set_var_value(char *name, value_t val) {
+    for (int i=0;i<state.var_count;i++) {
+        if (!strcmp(name,state.var_names[i])) {
+            state.var_values[i] = val;
+            return;
+        }
+    }
+    state.var_names[state.var_count] = strdup(name);
+    state.var_values[state.var_count] = val;
+    state.var_count++;
+}
+
 // get subroutine info from name, returns zero'ed struct if not found (check if name!=NULL)
 struct subroutine_info get_subroutine_info(char* name) {
     for (int i=0;i<state.subroutine_count;i++) {
@@ -236,7 +255,8 @@ char* parse_string(char *str) {
         destptr++;
 
     }
-
+    *destptr = 0;
+    
     // dest might be too big, so lets make res which is the right size
     char *res = strdup(dest);
     free(dest);
@@ -261,13 +281,21 @@ void do_instruction(char *tok, char *rest) {
 
         push_val(v);
     } else
+    if (!strcmp(tok,W_PUSHVAR)) {
+        tok = strtok_r(rest," \t",&rest);
+        push_val(get_var_value(tok));
+    } else
+    if (!strcmp(tok,W_POPVAR)) {
+        tok = strtok_r(rest," \t",&rest);
+        set_var_value(tok, pop_val());
+    } else
     if (!strcmp(tok,W_PRINT)) {
         value_t v = pop_val();
         switch (v.type) {
         case VAL_NUM:
-            printf("%f\n",v.num); break;
+            printf("%f",v.num); break;
         case VAL_STR:
-            printf("%s\n",v.str); break;
+            printf("%s",v.str); break;
         default:
             printf("(null value)\n"); break;
         }
@@ -275,7 +303,7 @@ void do_instruction(char *tok, char *rest) {
     if (!strcmp(tok,W_READNUM)) {
         value_t value;
         value.type = VAL_NUM;
-        printf("\t\t\t\t\t\tinput nuber: ");
+        /* printf("\t\t\t\t\t\tinput nuber: "); */
         if (scanf("%f",&value.num) != 1) {
             printf("\t\t\t\t\t\t invalid so 0 >:(");
             value = (value_t){.type=VAL_NUM,.num=0};
@@ -368,7 +396,11 @@ void look_at_dis_line(char *str) {
 
     // get keyword
     tok = strtok_r(rest, " \t", &rest);
-    // (wont be NULL bc this doesnt get ran on empty strings)
+
+    if (tok == NULL) {
+        // empty line, return
+        return;
+    }
 
     if (state.skip) {
         do_skip(tok);
@@ -392,11 +424,8 @@ void look_at_dis_line(char *str) {
         /* printf("im in if!\n"); */
     } else
     if (!strcmp(tok,W_THEN)) {
-        /* printf("then what\n"); */
-        /* bool value = rand()&1; //TODO: actually get value */
         bool value = is_value_true(pop_val());
         /* printf("ok its %s\n",value?"true":"false"); */
-        block_item* block = get_block();
 
         if (value == false) {
             state.skip = true;
@@ -421,6 +450,20 @@ void look_at_dis_line(char *str) {
         }
         state.current_subroutine.name = strdup(tok);
         state.current_subroutine.start = state.lineptr+1;
+    } else
+    if (!strcmp(tok,W_WHILE)) {
+        push_block((block_item){.type=BLOCK_WHILE,.while_start=state.lineptr});
+    } else
+    if (!strcmp(tok,W_DO)) {
+        bool value = is_value_true(pop_val());
+
+        if (value == false) {
+            state.skip = true;
+            state.skip_depth = 0;
+        }
+    } else
+    if (!strcmp(tok,W_ENDWHILE)) {
+        state.lineptr = get_block()->while_start; // dont do -1 bc if we do `while` again it causes a block stack overflow
     }
 
 }
@@ -428,7 +471,7 @@ void look_at_dis_line(char *str) {
 void interp_go() {
     for (;state.lineptr < state.linecount; state.lineptr++) {
         if (debug_lines) {
-            printf("lp=%02d  |  '%s'\n",state.lineptr,state.lines[state.lineptr]);
+            printf("lp=%02d %s |  '%s'\n",state.lineptr,state.skip?"(skip)":"",state.lines[state.lineptr]);
         }
         if (strlen(state.lines[state.lineptr])==0) {
             /* printf("\tempty, skipping...\n"); */
@@ -463,7 +506,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (filename==NULL) {
+    if (filename == NULL) {
         printf("need filename (-f name)\n");
         exit(1);
     }

@@ -1,11 +1,14 @@
 
 
-#define W_IF     "if"
-#define W_THEN   "then"
-#define W_ELSE   "else"
-#define W_ENDIF  "endif"
-#define W_DEFSUB "defsub"
-#define W_ENDSUB "endsub"
+#define W_IF       "if"
+#define W_THEN     "then"
+#define W_ELSE     "else"
+#define W_ENDIF    "endif"
+#define W_DEFSUB   "defsub"
+#define W_ENDSUB   "endsub"
+#define W_WHILE    "while"
+#define W_DO       "do"
+#define W_ENDWHILE "endwhile"
 
 // instructions
 
