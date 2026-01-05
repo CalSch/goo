@@ -33,6 +33,11 @@
 #define W_LTE "lte"
 #define W_GTE "gte"
 
+#define W_AND "and"
+#define W_OR  "or"
+#define W_XOR "xor"
+#define W_NOT "not"
+
 #define W_GOSUB "gosub"
 #define W_RETURN "return"
 

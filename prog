@@ -1,39 +1,68 @@
-var n
+pushstr "type nuber: "
+print
+
 readnum
 popvar n
 
 defsub even
-	# n=n/2
+	pushstr "even\n"
+	print
+
 	pushvar n
 	pushnum 2
 	div
 	popvar n
+
+	return
 endsub
 
 defsub odd
-	# n=3*n+1
+	pushstr "odd\n"
+	print
+
 	pushnum 1
 	pushvar n
 	pushnum 3
 	mul
 	add
 	popvar n
+
+	return
 endsub
 
+pushnum 0
+popvar iter
 
 while
 	pushvar n
-	neq 1
+	pushnum 1
+	neq
 do
+	pushstr "\n"
+	pushvar n
+	print
+	print
+
 	if
 		pushvar n
 		pushnum 2
 		mod
-	do
-		gosub even
-	else
+	then
 		gosub odd
+	else
+		gosub even
 	endif
+
+	pushvar iter
+	pushnum 1
+	add
+	popvar iter
 endwhile
 
+pushstr "\n"
+pushvar iter
+pushstr "iter="
+print
+print
+print
 

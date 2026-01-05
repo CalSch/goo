@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <time.h>
+#include <stdbool.h>
+#include <math.h>
 
 #include "words.h"
 
@@ -45,6 +47,16 @@ bool is_value_true(value_t v) {
         return v.str != NULL && strlen(v.str) != 0;
     default:
         return false;
+    }
+}
+void printval(value_t v) {
+    switch (v.type) {
+        case VAL_NUM:
+            printf("%f",v.num); break;
+        case VAL_STR:
+            printf("%s",v.str); break;
+        default:
+            printf("(null value)"); break;
     }
 }
 
@@ -190,6 +202,30 @@ const char* INST_KWS[] = {
     W_PUSHNUM,
     W_PUSHSTR,
     W_READNUM,
+
+    W_ADD,
+    W_SUB,
+    W_MUL,
+    W_DIV,
+    W_MOD,
+
+    W_EQ,
+    W_NEQ,
+    W_GT,
+    W_LT,
+    W_GTE,
+    W_LTE,
+
+    W_AND,
+    W_OR,
+    W_XOR,
+    W_NOT,
+
+    W_GOSUB,
+    W_RETURN,
+    W_PRINT,
+};
+const char* MATH_KWS[] = {
     W_ADD,
     W_SUB,
     W_MUL,
@@ -197,13 +233,13 @@ const char* INST_KWS[] = {
     W_MOD,
     W_EQ,
     W_NEQ,
-    W_GT,
     W_LT,
-    W_GTE,
+    W_GT,
     W_LTE,
-    W_GOSUB,
-    W_RETURN,
-    W_PRINT,
+    W_GTE,
+    W_AND,
+    W_OR,
+    W_XOR,
 };
 
 int get_instruction(char *str) {
@@ -264,8 +300,71 @@ char* parse_string(char *str) {
     return res;
 }
 
+
+void print_value_stack() {
+    for (int i=0;i<state.stack_ptr;i++) {
+        printf("stack[%2d]=", i);
+        printval(state.stack[i]);
+        printf("\n");
+    }
+}
+void print_block_stack() {
+    for (int i=0;i<state.block_stack_ptr;i++) {
+        printf("blocks[%2d]: type=%d while_start=%d\n", i, state.block_stack[i].type, state.block_stack[i].while_start);
+    }
+}
+
+
+// NOTE: `inst` is a pointer to the string in MATH_KWS, this is bc we can do == instead of strcmp which is faster
+void do_math(const char *inst) {
+    value_t b = pop_val();
+    value_t a = pop_val();
+
+    value_t res = (value_t){.type=VAL_NUM};
+
+    if (a.type != VAL_NUM || b.type != VAL_NUM) {
+        printf("gah! invalid math parameters!\n instruction: %s\n",inst);
+        printf("\ta=");
+        printval(a);
+        printf("\n");
+        printf("\tb=");
+        printval(a);
+        printf("\n");
+    }
+
+    if      (inst == W_ADD) res.num = a.num + b.num;
+    else if (inst == W_SUB) res.num = a.num - b.num;
+    else if (inst == W_MUL) res.num = a.num * b.num;
+    else if (inst == W_DIV) res.num = a.num / b.num;
+    else if (inst == W_MOD) res.num = fmod(a.num, b.num);
+
+    else if (inst == W_EQ)  res.num = a.num == b.num;
+    else if (inst == W_NEQ) res.num = a.num != b.num;
+    else if (inst == W_LT)  res.num = a.num <  b.num;
+    else if (inst == W_GT)  res.num = a.num >  b.num;
+    else if (inst == W_LTE) res.num = a.num <= b.num;
+    else if (inst == W_GTE) res.num = a.num >= b.num;
+
+    else if (inst == W_AND) res.num = (int)a.num & (int)b.num;
+    else if (inst == W_OR)  res.num = (int)a.num | (int)b.num;
+    else if (inst == W_XOR) res.num = (int)a.num ^ (int)b.num;
+
+    if (debug_lines) { //TODO: new debug var
+        printf("math: %f %s %f -> %f\n",a.num,inst,b.num,res.num);
+    }
+
+    push_val(res);
+}
+
 void do_instruction(char *tok, char *rest) {
     /* printf("\tim a do instructin: '%s' '%s'\n",tok,rest); */
+
+    for (int i=0;i<sizeof(MATH_KWS)/sizeof(MATH_KWS[0]);i++) {
+        if (!strcmp(MATH_KWS[i],tok)) {
+            do_math(MATH_KWS[i]);
+            return;
+        }
+    }
     
     if (!strcmp(tok,W_PUSHNUM)) {
         value_t v = (value_t){.type=VAL_NUM, .num=atof(rest)}; //TODO: error detection AND replace `rest` w/ getting another token
@@ -291,14 +390,7 @@ void do_instruction(char *tok, char *rest) {
     } else
     if (!strcmp(tok,W_PRINT)) {
         value_t v = pop_val();
-        switch (v.type) {
-        case VAL_NUM:
-            printf("%f",v.num); break;
-        case VAL_STR:
-            printf("%s",v.str); break;
-        default:
-            printf("(null value)\n"); break;
-        }
+        printval(v);
     } else
     if (!strcmp(tok,W_READNUM)) {
         value_t value;
@@ -309,18 +401,6 @@ void do_instruction(char *tok, char *rest) {
             value = (value_t){.type=VAL_NUM,.num=0};
         }
         push_val(value);
-    } else
-    if (!strcmp(tok,W_ADD)) {
-        value_t b = pop_val();
-        value_t a = pop_val();
-        //TODO: assert a.type == VAL_NUM && b.type == VAL_NUM
-        push_val((value_t){.type=VAL_NUM, .num = a.num+b.num});
-    } else
-    if (!strcmp(tok,W_EQ)) {
-        value_t b = pop_val();
-        value_t a = pop_val();
-        //TODO: assert a.type == VAL_NUM && b.type == VAL_NUM
-        push_val((value_t){.type=VAL_NUM, .num = a.num == b.num});
     } else
     if (!strcmp(tok,W_GOSUB)) {
         // read the sub name
@@ -340,6 +420,13 @@ void do_instruction(char *tok, char *rest) {
         state.lineptr = pop_call(); // DONT -1 bc that would run `gosub` again and cause an infinite loop
 
         /* printf("returning to %d\n",state.lineptr); */
+    } else
+    if (!strcmp(tok,W_NOT)) {
+        value_t v = pop_val();
+        //TODO: assert v.type == VAL_NUM
+        //TODO: conversion seems weird, do smth else?
+        v.num = (float)(~(int)v.num);
+        push_val(v);
     }
 }
 
@@ -359,6 +446,14 @@ void do_skip(char* tok) {
             state.skip_depth--;
         }
         break;
+    case BLOCK_WHILE:
+        //TODO: implement
+        if (!strcmp(tok,W_WHILE)) {
+            state.skip_depth++;
+        } else if (!strcmp(tok,W_ENDWHILE)) {
+            state.skip_depth--;
+        }
+        break;
     default:
         printf("gah! idk what to do! (do_skip)\n");
         break;
@@ -366,6 +461,7 @@ void do_skip(char* tok) {
 
     if (state.skip_depth == -1) { // -1 means that *this* token ended the skip state
         state.skip = false;
+        pop_block();
     }
 }
 
@@ -424,17 +520,24 @@ void look_at_dis_line(char *str) {
         /* printf("im in if!\n"); */
     } else
     if (!strcmp(tok,W_THEN)) {
-        bool value = is_value_true(pop_val());
+        value_t v = pop_val();
+        bool b = is_value_true(v);
         /* printf("ok its %s\n",value?"true":"false"); */
 
-        if (value == false) {
+        if (debug_lines) { //TODO: new debug variable
+            printf("value=");
+            printval(v);
+            printf("\n");
+        }
+
+        if (b == false) {
             state.skip = true;
             state.skip_depth = 0;
         }
     } else
     if (!strcmp(tok,W_ELSE)) {
         // if we see this then it means that we aren't skipping (so the
-        // condition was true) so we should skip until `endif`
+        // condition was true) so we should skip until `
         state.skip = true;
         state.skip_depth = 0;
     } else
@@ -463,7 +566,16 @@ void look_at_dis_line(char *str) {
         }
     } else
     if (!strcmp(tok,W_ENDWHILE)) {
+        if (get_block()->type != BLOCK_WHILE) {
+            printf("gah! reached 'endwhile' but top block isnt a while block!\n");
+            printf("block stack:\n");
+            print_block_stack();
+        }
         state.lineptr = get_block()->while_start; // dont do -1 bc if we do `while` again it causes a block stack overflow
+        /* printf("type=%d v=%d\n",get_block()->type,get_block()->while_start); */
+    } else
+    {
+        printf("couldn't parse line: '%s'\n",str);
     }
 
 }
@@ -471,7 +583,10 @@ void look_at_dis_line(char *str) {
 void interp_go() {
     for (;state.lineptr < state.linecount; state.lineptr++) {
         if (debug_lines) {
-            printf("lp=%02d %s |  '%s'\n",state.lineptr,state.skip?"(skip)":"",state.lines[state.lineptr]);
+            printf("lp=%02d ",state.lineptr);
+            if (state.skip)
+                printf("(skip=%d)",state.skip_depth);
+            printf(" |  '%s'\n",state.lines[state.lineptr]);
         }
         if (strlen(state.lines[state.lineptr])==0) {
             /* printf("\tempty, skipping...\n"); */
