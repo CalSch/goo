@@ -199,6 +199,7 @@ void add_subroutine(char* name, struct subroutine_info info) {
 const char* INST_KWS[] = {
     W_PUSHVAR,
     W_POPVAR,
+    W_PULLVAR,
     W_PUSHNUM,
     W_PUSHSTR,
     W_READNUM,
@@ -224,6 +225,7 @@ const char* INST_KWS[] = {
     W_GOSUB,
     W_RETURN,
     W_PRINT,
+    W_BREAK,
 };
 const char* MATH_KWS[] = {
     W_ADD,
@@ -388,6 +390,10 @@ void do_instruction(char *tok, char *rest) {
         tok = strtok_r(rest," \t",&rest);
         set_var_value(tok, pop_val());
     } else
+    if (!strcmp(tok,W_PULLVAR)) {
+        tok = strtok_r(rest," \t",&rest);
+        set_var_value(tok, state.stack[state.stack_ptr-1]); //TODO: refactor into pull_var() or get_var()?
+    } else
     if (!strcmp(tok,W_PRINT)) {
         value_t v = pop_val();
         printval(v);
@@ -427,7 +433,15 @@ void do_instruction(char *tok, char *rest) {
         //TODO: conversion seems weird, do smth else?
         v.num = (float)(~(int)v.num);
         push_val(v);
-    }
+    } else
+    if (!strcmp(tok,W_BREAK)) {
+        while (get_block()->type != BLOCK_WHILE)
+            pop_block();
+        state.skip = true;
+        state.skip_depth = 0;
+        printf("BREAK!\n");
+    } else
+    {}
 }
 
 void do_skip(char* tok) {
