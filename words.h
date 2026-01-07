@@ -18,6 +18,7 @@
 #define W_READNUM "readnum"
 
 #define W_POPVAR "popvar"
+#define W_PULLVAR "pullvar"
 #define W_PRINT "print"
 
 #define W_ADD "add"
@@ -40,4 +41,5 @@
 
 #define W_GOSUB "gosub"
 #define W_RETURN "return"
+#define W_BREAK "break"
 
