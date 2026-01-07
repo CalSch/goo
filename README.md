@@ -1,17 +1,101 @@
+## what is goo
+
 - fully interpreted, stack based language
-- instructions: pushnum, pushvar, popvar, add, print, etc.
-- blocks: `if`, `while` coming soon
+- some instructions: pushnum, pushvar, popvar, add, print, etc.
+- if and while statements
 
-ideas:
-- keep track of what pushed each value onto the stack for debuggering
+## example program(s)
 
-todo:
+<details>
+<summary>3n+1 thing</summary>
+
+```
+pushstr "type nuber: "
+print
+
+readnum
+popvar n
+
+defsub even
+	pushstr "even\n"
+	print
+
+	pushvar n
+	pushnum 2
+	div
+	popvar n
+
+	return
+endsub
+
+defsub odd
+	pushstr "odd\n"
+	print
+
+	pushnum 1
+	pushvar n
+	pushnum 3
+	mul
+	add
+	popvar n
+
+	return
+endsub
+
+pushnum 0
+popvar iter
+
+while
+	pushvar n
+	pushnum 1
+	neq
+do
+	pushvar n
+	print
+	pushstr "\n"
+	print
+
+	if
+		pushvar n
+		pushnum 2
+		mod
+	then
+		gosub odd
+	else
+		gosub even
+	endif
+
+	if
+		pushvar n
+		pushnum 1677216
+		gte
+	then
+		pushstr "too big\n"
+		print
+		break
+	endif
+
+	pushvar iter
+	pushnum 1
+	add
+	popvar iter
+endwhile
+
+pushstr "iter="
+print
+pushvar iter
+print
+pushstr "\n"
+print
+```
+</details>
+
+## todo
 - fix TODO comments
 - ~~subroutine reading doesnt really need to go on the block stack, make the subroutine state its own thing~~
 - make nice functions
 	- `is_reading_subroutine()`
 	- `goto(int loc)`
-- make value_t not just an int (ie add strings)
 - better error stuff. not just `printf("gah! info"); exit(1);`
 	- stack trace
 - reorganize stuff
@@ -21,8 +105,9 @@ todo:
 - different number type? like arbitrary precision
 - label & goto
 - apply the math token optimization (where `char *tok` is a pointer to the keywords array instead of the code for faster checking) to other cases
+- keep track of what pushed each value onto the stack for debuggering
 
-how things work:
+## how things work
 - variables:
 	- stored as a list of variable names and another for values
 	- on `pushvar`, check if the variable exists and push the value
@@ -63,4 +148,3 @@ how things work:
 		- skip until `endsub`
 	- needs `return` before `endsub`!
 	- on `gosub <name>`, the `lineptr` is pushed to the call stack and it jumps to the start of the subroutine
-	
